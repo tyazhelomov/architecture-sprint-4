@@ -1,0 +1,34 @@
+@startuml
+
+participant "Оператор" as Operator
+participant "MES" as MES
+participant "Кеш" as Cache
+participant "База данных" as Database
+
+== Чтение списка заказов ==
+Operator -> MES: Запрос списка заказов
+MES -> Cache: Проверка наличия списка заказов в кеше
+alt Заказы найдены в кеше
+    Cache -> MES: Возвращает список заказов
+else Заказы не найдены в кеше
+    MES -> Database: Запрос на последнее изменение записей (с учетом пагинации)
+    Database -> MES: Возвращает время последнего изменения
+    MES -> Operator: Проверка ETag
+    alt Данные не изменились
+        MES -> Operator: Возвращает 304 Not Modified
+    else Данные изменились
+        MES -> Database: Запрос обновленного списка заказов
+        Database -> MES: Возвращает список заказов
+        MES -> Cache: Сохранение списка заказов в кеш (Read-Through)
+    end
+end
+MES -> Operator: Возвращает список заказов
+
+== Изменение статуса заказа ==
+Operator -> MES: Запрос на изменение статуса заказа
+MES -> Database: Обновление статуса заказа
+Database -> MES: Подтверждение изменения
+MES -> Cache: Обновление данных в кеше (Write-Through)
+MES -> Operator: Подтверждение изменения
+
+@enduml
